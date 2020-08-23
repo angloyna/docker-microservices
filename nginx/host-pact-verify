@@ -1,0 +1,15 @@
+server
+{
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name pact-verify.local-stack.cloud;
+    ssl_certificate ssl/local-stack.cloud.crt;
+    ssl_certificate_key ssl/local-stack.cloud.key;
+    ssl_protocols       TLSv1 TLSv1.1 TLSv1.2;
+
+    location /
+    {
+        include /etc/nginx/proxy_params;
+        proxy_pass http://pact-verify:$pact_verify_port;
+    }
+}

@@ -1,0 +1,41 @@
+{
+  "dev": {
+    "loggly": {
+      "LOGGLY_SUBDOMAIN": "",
+      "LOGGLY_TOKEN": ""
+    },
+    "nginx": {
+      "SERVICE_TWO_PORT": null,
+      "SERVICE_ONE_PORT": null,
+      "SERVICE_TWO_FRONTEND_PORT": null
+    },
+    "local": {
+      "service-two": {
+        "EnvType": "dev",
+        "LOG_LEVEL": "debug",
+        "NODE_ENV": "development",
+        "PGDATABASE": "service_two",
+        "PGHOST": "postgres",
+        "PGPASSWORD": "postgres",
+        "PGPORT": "5432",
+        "PGUSER": "postgres"
+      },
+      "service-one": {
+        "CONSUL_PATH": "dev/local/",
+        "LOG_LEVEL": "trace",
+        "NODE_ENV": "development",
+        "PGDATABASE": "plat",
+        "PGHOST": "postgres",
+        "PGPASSWORD": "postgres",
+        "PGPORT": "5432",
+        "PGUSER": "postgres",
+        "SERVICE_ONE_PORT": "5001",
+        "SECRET_S2S": "server-two-server-local",
+        "SECRET_USER_TOKEN": "local-secret"
+      },
+      "url_service_two": "https://service-two.local-stack.cloud",
+      "url_service_two-frontend": "https://service-two-frontend.local-stack.cloud",
+      "url_service_one": "https://service-one.local-stack.cloud"
+    }
+  }
+}

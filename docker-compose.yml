@@ -1,0 +1,195 @@
+version: "3.2"
+
+services:
+  networkhost:
+    image: qoomon/docker-host
+    hostname: networkhost
+    cap_add: [ 'NET_ADMIN', 'NET_RAW' ]
+    restart: on-failure
+    networks:
+      - stack
+
+  consul:
+    image: consul:latest
+    hostname: consul
+    ports:
+      - '${EXPOSE_CONSUL_PORT-8500}:${EXPOSE_CONSUL_PORT-8500}'
+    depends_on:
+      - proxy
+    networks:
+      - stack
+
+  env-setup:
+    image: node:8.11-alpine
+    entrypoint: "./env-scripts/create-env.sh"
+    env_file:
+      - environment/docker.env
+    working_dir: /src/
+    volumes:
+      - ./:/src/
+    networks:
+      - stack
+    external_links:
+      - consul:consul.local-mml.cloud
+
+  postgres:
+    image: ${POSTGRES_IMAGE}
+    hostname: postgres
+    environment:
+      POSTGRES_USER: ${PGUSER:-postgres}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-postgres}
+      POSTGRES_DB: ${PGDATABASE:-db}
+    ports:
+      - '${EXPOSE_POSTGRES_PORT:-5432}:5432'
+    networks:
+      - stack
+
+  mysql:
+    image: ${MYSQL_IMAGE}
+    hostname: mysql
+    env_file:
+      - environment/slapi.env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-mysql}
+    ports:
+      - '${EXPOSE_MYSQL_PORT:-3306}:${EXPOSE_MYSQL_PORT:-3306}'
+    command:
+      - --sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
+    networks:
+      - stack
+
+  redis:
+    image: redis:4-alpine
+    hostname: redis
+    ports:
+      - '${EXPOSE_REDIS_PORT:-6379}:${EXPOSE_REDIS_PORT:-6379}'
+    networks:
+      - stack
+
+  memcached:
+    image: memcached:1.5-alpine
+    hostname: memcached
+    networks:
+      - stack
+
+  proxy:
+    image: ${PROXY_IMAGE}
+    hostname: proxy
+    env_file:
+      - environment/docker.env
+    environment:
+      SERVICE_TWO_FRONTEND_PORT: ${SERVICE_TWO_FRONTEND_PORT}
+      SERVICE_TWO_PORT: ${SERVICE_TWO_PROXY_PORT}
+      SERVICE_ONE_PORT: ${SERVICE_ONE_PROXY_PORT}
+    ports:
+      - '80:80'
+      - '443:443'
+    networks:
+      - stack
+    external_links:
+      - proxy:consul.local-stack.cloud
+      - proxy:service-two.local-stack.cloud
+      - proxy:service-one.local-stack.cloud
+      - proxy:pact-verify.local-stack.cloud
+
+  service-one:
+    image: ${SERVICE_ONE_IMAGE}
+    depends_on:
+      - postgres
+    hostname: service-one
+    env_file:
+      - environment/service_one.env
+    environment:
+      PGDATABASE: ${SERVICE_ONE_DATABASE}
+      PGHOST: ${PGHOST:-postgres}
+      PGPORT: ${PGPORT:-5432}
+      PGUSER: ${PGUSER:-postgres}
+      PGPASSWORD: ${PGPASSWORD:-postgres}
+      SERVICE_ONE_INSPECT_PORT: $SERVICE_ONE_INSPECT_PORT
+    ports:
+      - "${SERVICE_ONE_INSPECT_PORT:-9201}:${SERVICE_ONE_INSPECT_PORT:-9201}"
+    external_links:
+      - proxy:consul.local-mml.cloud
+      - proxy:service-two.local-mml.cloud
+      - proxy:service-one.local-mml.cloud
+    networks:
+      - stack
+
+  service-one-migration:
+    image: ${SERVICE_ONE_MIGRATION_IMAGE}
+    depends_on:
+      - postgres
+    command: -X -url=jdbc:postgresql://${PGHOST}:5432/$SERVICE_ONE_DATABASE -user=$PGUSER -password='$PGPASSWORD' -baselineOnMigrate=true -outOfOrder=true migrate
+    env_file:
+      - environment/service_one.env
+    networks:
+      - stack
+
+  service-two:
+    image: ${SERVICE_TWO_IMAGE}
+    hostname: service-two
+    depends_on:
+      - postgres
+    env_file:
+      - environment/service_two.env
+    environment:
+      PGDATABASE: ${SERVICE_TWO_DATABASE}
+      PGHOST: ${PGHOST:-postgres}
+      PGPORT: ${PGPORT:-5432}
+      PGUSER: ${PGUSER:-postgres}
+      PGPASSWORD: ${PGPASSWORD:-postgres}
+    ports:
+      - "${SERVICE_TWO_PORT:-5000}:${SERVICE_TWO_PORT:-5000}"
+    external_links:
+      - proxy:consul.local-mml.cloud
+      - proxy:service-two.local-mml.cloud
+      - proxy:service-one.local-mml.cloud
+    networks:
+      - stack
+
+  service-one-minimum-data-set:
+    image: ${POSTGRES_IMAGE}
+    volumes:
+      - ./seed/plat/:/seed/
+    entrypoint:  psql postgres://${PGUSER:-postgres}:${PGPASSWORD:-postgres}@${PGHOST}:${PGPORT:-5432}/${SERVICE_ONE_DATABASE:-service_one} -f /seed/init_data.sql
+    networks:
+      - stack
+    depends_on:
+      - postgres
+
+  pact-verify:
+    image: ${CONTRACT_VERIFICATION_IMAGE}
+    hostname: pact-verify
+    ports:
+      - '2289:2289'
+    environment:
+      PACT_BROKER_USERNAME: ${PACT_BROKER_USERNAME:-pact_user}
+      PACT_BROKER_PASSWORD: ${PACT_BROKER_PASSWORD}
+      PACT_BROKER_URL: ${PACT_BROKER_URL}
+      PGHOST: ${PGHOST:-postgres}
+      PGUSER: ${PGUSER:-postgres}
+      PGPASSWORD: ${PGPASSWORD:-postgres}
+      SERVICE_ONE_DB: ${SERVICE_ONE_DATABASE:-service_one}
+      SERVICE_TWO_DB: ${SERVICE_TWO_DATABASE:-service_two}
+      SERVICE_TWO_URL: ${SERVICE_TWO_URL:-https://service-two.local-stack.cloud}
+      PGPORT: ${PGPORT:-5432}
+      JWT_SECRET: ${JWT_SECRET:-server-two-server-local}
+      PACT_PROVIDER_BASE_URL: ${PACT_PROVIDER_BASE_URL:-https://service-one.local-stack.cloud}
+      PACT_PROVIDER_NAME: ${PACT_PROVIDER_NAME}
+      IS_DOCKER_ACHIEVE: 'true'
+      USER_JWT_SECRET: ${USER_JWT_SECRET:-local-secret}
+    external_links:
+      - proxy:consul.local-stack.cloud
+      - proxy:service-one.local-stack.cloud
+      - proxy:service-two.local-stack.cloud
+      - proxy:pact-verify.local-stack.cloud
+    networks:
+      - stack
+
+# Force docker to use 172.20 reserved IPs to not conflict with our VPCs
+networks:
+  stack:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.120.0/24

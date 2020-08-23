@@ -1,0 +1,2 @@
+-- SEED DATA --
+SELECT 1;

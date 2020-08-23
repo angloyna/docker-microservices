@@ -1,0 +1,39 @@
+user              nginx;
+worker_processes  1;
+error_log         /var/log/nginx/error.log debug;
+pid               /var/run/nginx.pid;
+load_module modules/ngx_http_perl_module.so;
+
+env SERVICE_ONE_PORT;
+env SERVICE_TWO_PORT;
+
+env SERVICE_TWO_FRONTEND_PORT;
+
+env PACT_VERIFY_PORT;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    resolver 127.0.0.11 valid=1s;
+    include                     /etc/nginx/mime.types;
+    sendfile                    off;
+    server_tokens               off;
+
+    perl_set $service_two_port  'sub { return $ENV{"SERVICE_TWO_PORT"} || 5000; }';
+    perl_set $service_one_port  'sub { return $ENV{"SERVICE_ONE_PORT"} || 5001; }';
+
+    perl_set $service_two_frontend_port  'sub { return $ENV{"SERVICE_TWO_FRONTEND_PORT"} || 0; }';
+
+    perl_set $pact_verify_port  'sub { return $ENV{"PACT_VERIFY_PORT"} || 2289; }';
+
+    server {
+      listen 80 default_server;
+      server_name _;
+      return 301 https://$host$request_uri;
+    }
+
+    include /etc/nginx/host-*;
+    include /etc/nginx/static-*;
+}

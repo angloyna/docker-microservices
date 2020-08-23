@@ -1,0 +1,23 @@
+server
+{
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name service_two-frontend.local-stack.cloud stack.local-stack.cloud;
+    ssl_certificate ssl/local-stack.cloud.crt;
+    ssl_certificate_key ssl/local-stack.cloud.key;
+    ssl_protocols       TLSv1 TLSv1.1 TLSv1.2;
+
+    location /
+    {
+      include /etc/nginx/proxy_params;
+      if ($service_two_frontend_port) {
+        proxy_pass http://networkhost:$service_two_frontend_port;
+      }
+      error_page 404 /index.html;
+      location = /index.html {
+        root /data/service_two;
+        internal;
+      }
+      root /data/service_two;
+    }
+}

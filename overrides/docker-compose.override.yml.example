@@ -1,0 +1,241 @@
+version: "3.2"
+
+services:
+  services:
+  courseware:
+    image: courseware:local
+    build:
+      context: ../psv-services/
+      dockerfile: Dockerfile.dev
+    hostname: courseware
+    environment:
+      COURSEWARE_INSPECT_PORT: 9200
+    ports:
+      - "${COURSEWARE_INSPECT_PORT:-9200}:${COURSEWARE_INSPECT_PORT:-9200}"
+    entrypoint: yarn start-achieve
+    volumes:
+      - ../psv-services/tools
+      - ../psv-services/lib:/usr/src/app/lib
+      - ../psv-services/services:/usr/src/app/services
+    networks:
+      - achieve
+    external_links:
+      - proxy:slapi.local-mml.cloud
+      - proxy:pythag.local-mml.cloud
+      - proxy:pathfinder.local-mml.cloud
+
+  # Insure that SQL matches the code
+  courseware-migration:
+    image: boxfuse/flyway:latest
+    volumes:
+      - ../psv-services/migrations/:/flyway/
+    environment:
+      - POSTGRES_USER=${PGUSER:-postgres}
+      - POSTGRES_PASSWORD=${PGPASSWORD:-postgres}
+      - POSTGRES_DB=${COURSEWARE_DATABASE:-db}
+    command: -X -url=jdbc:postgresql://postgres:5432/${COURSEWARE_DATABASE:-courseware} -user=${PGUSER:-postgres} -password=${PGPASSWORD:-postgres} -baselineOnMigrate=true -outOfOrder=true migrate
+    networks:
+      - achieve
+    depends_on:
+      - postgres
+    external_links:
+      - proxy:consul.local-mml.cloud
+      - proxy:iam.local-mml.cloud
+      - proxy:assess.local-mml.cloud
+      - proxy:pythag.local-mml.cloud
+      - proxy:courseware.local-mml.cloud
+      - proxy:learningcurve-api.local-mml.cloud
+      - proxy:plat.local-mml.cloud
+      - proxy:reading.local-mml.cloud
+      - proxy:writing-api.local-mml.cloud
+      - proxy:ads.local-mml.cloud
+
+  # Insure that SQL matches the code
+  learningcurve-migration:
+    volumes:
+      - ../learning_curve/migration/sql:/flyway/sql
+    depends_on:
+      - postgres
+    
+  iam:
+    image: iam:local
+    hostname: iam
+    env_file:
+      - environment/iam.env
+    build:
+      context: ../ml-iam/
+      dockerfile: Dockerfile
+    environment:
+      IAM_INSPECT_PORT: 9202
+    entrypoint: yarn start
+    ports:
+      - "${IAM_INSPECT_PORT:-9202}:${IAM_INSPECT_PORT:-9202}"
+    volumes:
+      - ../ml-iam/lib:/usr/src/app/lib
+      - ../ml-iam/services:/usr/src/app/services
+    networks:
+      - achieve
+    external_links:
+      - proxy:consul.local-mml.cloud
+      - proxy:iam.local-mml.cloud
+      - proxy:courseware.local-mml.cloud
+      - proxy:plat.local-mml.cloud
+      - proxy:ads.local-mml.cloud
+
+  #iam-build:
+  #  image: iam:local
+  #  hostname: iam
+  #  env_file:
+  #    - environment/iam.env
+  #  build:
+  #    context: ../ml-iam/
+  #    dockerfile: Dockerfile
+  #  environment:
+  #    IAM_INSPECT_PORT: 9202
+  #  entrypoint: yarn start
+  #  ports:
+  #    - "${IAM_INSPECT_PORT:-9202}:${IAM_INSPECT_PORT:-9202}"
+  #  volumes:
+  #    - ../ml-iam/lib:/usr/src/app/lib
+  #    - ../ml-iam/services:/usr/src/app/services
+  #  networks:
+  #    - achieve
+  #  external_links:
+  #    - proxy:consul.local-mml.cloud
+  #    - proxy:iam.local-mml.cloud
+  #    - proxy:courseware.local-mml.cloud
+  #    - proxy:plat.local-mml.cloud
+  #    - proxy:ads.local-mml.cloud
+
+  plat:
+    image: plat:local
+    build:
+      context: ../plat-services/
+      dockerfile: Dockerfile-plat
+    hostname: plat
+    env_file:
+      - environment/plat.env
+    environment:
+      PLAT_INSPECT_PORT: 9201
+    entrypoint: yarn start-plat
+    ports:
+      - "${PLAT_INSPECT_PORT:-9201}:${PLAT_INSPECT_PORT:-9201}"
+    volumes:
+      - ../plat-services/lib:/usr/src/app/lib
+      - ../plat-services/services:/usr/src/app/services
+    networks:
+      - achieve
+    external_links:
+      - proxy:consul.local-mml.cloud
+      - proxy:iam.local-mml.cloud
+      - proxy:assess.local-mml.cloud
+      - proxy:pythag.local-mml.cloud
+      - proxy:courseware.local-mml.cloud
+      - proxy:learningcurve-api.local-mml.cloud
+      - proxy:plat.local-mml.cloud
+      - proxy:reading.local-mml.cloud
+      - proxy:writing-api.local-mml.cloud
+      - proxy:ads.local-mml.cloud
+      - proxy:pathfinder.local-mml.cloud
+
+  pathfinder:
+    image: pathfinder:local
+    hostname: pathfinder
+    env_file:
+      - environment/pathfinder.env
+    environment:
+      PATHFINDER_INSPECT_PORT: 9205
+    entrypoint: yarn startDocker:dev:dbMigrate
+    ports:
+      - "${PATHFINDER_INSPECT_PORT:-9205}:${PATHFINDER_INSPECT_PORT:-9205}"
+    volumes:
+      - ../sl_pathfinder/website/:/home/app/
+      - ../sl_pathfinder/common/:/home/app/common/
+    networks:
+      - achieve
+    external_links:
+      - proxy:consul.local-mml.cloud
+      - proxy:iam.local-mml.cloud
+      - proxy:assess.local-mml.cloud
+      - proxy:pythag.local-mml.cloud
+      - proxy:courseware.local-mml.cloud
+      - proxy:learningcurve-api.local-mml.cloud
+      - proxy:plat.local-mml.cloud
+      - proxy:reading.local-mml.cloud
+      - proxy:writing-api.local-mml.cloud
+      - proxy:ads.local-mml.cloud
+      - proxy:pathfinder.local-mml.cloud
+  
+  pathfinder-build:
+    image: pathfinder:local
+    build:
+      context: ../sl_pathfinder/
+      dockerfile: website/Dockerfile
+    hostname: pathfinder
+    env_file:
+      - environment/pathfinder.env
+    environment:
+      PATHFINDER_INSPECT_PORT: 9205
+    entrypoint: yarn startDocker:dev:dbMigrate
+    ports:
+      - "${PATHFINDER_INSPECT_PORT:-9205}:${PATHFINDER_INSPECT_PORT:-9205}"
+    volumes:
+      - ../sl_pathfinder/website/:/home/app/
+      - ../sl_pathfinder/common/:/home/app/common/
+    networks:
+      - achieve
+    external_links:
+      - proxy:consul.local-mml.cloud
+      - proxy:iam.local-mml.cloud
+      - proxy:assess.local-mml.cloud
+      - proxy:pythag.local-mml.cloud
+      - proxy:courseware.local-mml.cloud
+      - proxy:learningcurve-api.local-mml.cloud
+      - proxy:plat.local-mml.cloud
+      - proxy:reading.local-mml.cloud
+      - proxy:writing-api.local-mml.cloud
+      - proxy:ads.local-mml.cloud
+      - proxy:pathfinder.local-mml.cloud
+
+  pathfinder-migration:
+    image: pathfinder:local
+    hostname: pathfinder
+    env_file:
+      - environment/pathfinder.env
+    environment:
+      PATHFINDER_INSPECT_PORT: 9205
+    entrypoint: yarn startDocker:migrate
+    volumes:
+      - ../sl_pathfinder/website/:/home/app/
+      - ../sl_pathfinder/common/:/home/app/common/
+    networks:
+      - achieve
+    external_links:
+      - proxy:consul.local-mml.cloud
+      - proxy:iam.local-mml.cloud
+      - proxy:assess.local-mml.cloud
+      - proxy:pythag.local-mml.cloud
+      - proxy:courseware.local-mml.cloud
+      - proxy:learningcurve-api.local-mml.cloud
+      - proxy:plat.local-mml.cloud
+      - proxy:reading.local-mml.cloud
+      - proxy:writing-api.local-mml.cloud
+      - proxy:ads.local-mml.cloud
+      - proxy:pathfinder.local-mml.cloud
+
+  assess-migration:
+    image: "assess-migration:local"
+    build:
+      context: ../assess
+      dockerfile: ./slapi/Dockerfile.ci
+
+  slapi:
+    image: "slapi:local"
+    build:
+      context: ../assess
+      dockerfile: ./slapi/Dockerfile.ci
+    volumes:
+      - ../assess/slapi/app.js:/mnt/myVol/sharedservices/slapi/app.js
+      - ../assess/slapi/util:/mnt/myVol/sharedservices/slapi/util
+      - ../assess/slapi/repos:/mnt/myVol/sharedservices/slapi/repos
+      - ../assess/slapi/controllers:/mnt/myVol/sharedservices/slapi/controllers

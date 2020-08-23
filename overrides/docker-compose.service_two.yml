@@ -1,0 +1,62 @@
+version: "3.2"
+
+services:
+  courseware:
+    image: courseware:local
+    build:
+      context: ../psv-services/
+      dockerfile: Dockerfile.dev
+    hostname: courseware
+    env_file:
+      - environment/courseware.env
+    environment:
+      COURSEWARE_INSPECT_PORT: 9200
+    ports:
+      - "${COURSEWARE_INSPECT_PORT:-9200}:${COURSEWARE_INSPECT_PORT:-9200}"
+    entrypoint: yarn start-dev
+    volumes:
+      - ../psv-services/tools:/usr/src/app/tools
+      - ../psv-services/lib:/usr/src/app/lib
+      - ../psv-services/services:/usr/src/app/services
+    networks:
+      - achieve
+    external_links:
+      - proxy:consul.local-mml.cloud
+      - proxy:iam.local-mml.cloud
+      - proxy:slapi.local-mml.cloud
+      - proxy:assess.local-mml.cloud
+      - proxy:pythag.local-mml.cloud
+      - proxy:courseware.local-mml.cloud
+      - proxy:learningcurve-api.local-mml.cloud
+      - proxy:plat.local-mml.cloud
+      - proxy:reading.local-mml.cloud
+      - proxy:writing-api.local-mml.cloud
+      - proxy:ads.local-mml.cloud
+      - proxy:pathfinder.local-mml.cloud
+
+
+  #Insure that SQL matches the code
+  courseware-migration:
+    image: boxfuse/flyway:latest
+    volumes:
+      - ../psv-services/migrations/:/flyway/
+    environment:
+      - POSTGRES_USER=${PGUSER:-postgres}
+      - POSTGRES_PASSWORD=${PGPASSWORD:-postgres}
+      - POSTGRES_DB=${COURSEWARE_DATABASE:-db}
+    command: -X -url=jdbc:postgresql://postgres:5432/${COURSEWARE_DATABASE:-courseware} -user=${PGUSER:-postgres} -password=${PGPASSWORD:-postgres} -baselineOnMigrate=true -outOfOrder=true migrate
+    networks:
+      - achieve
+    depends_on:
+      - postgres
+    external_links:
+      - proxy:consul.local-mml.cloud
+      - proxy:iam.local-mml.cloud
+      - proxy:assess.local-mml.cloud
+      - proxy:pythag.local-mml.cloud
+      - proxy:courseware.local-mml.cloud
+      - proxy:learningcurve-api.local-mml.cloud
+      - proxy:plat.local-mml.cloud
+      - proxy:reading.local-mml.cloud
+      - proxy:writing-api.local-mml.cloud
+      - proxy:ads.local-mml.cloud

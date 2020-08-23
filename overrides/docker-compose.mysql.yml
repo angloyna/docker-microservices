@@ -1,0 +1,15 @@
+version: "3.2"
+
+services:
+  mysql:
+    image: ${MYSQL_IMAGE}
+    hostname: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-mysql}
+    ports:
+      - '${EXPOSE_MYSQL_PORT:-3306}:3306'
+    volumes:
+      - ~/mysql/data:/var/lib/mysql
+    networks:
+      - achieve
+

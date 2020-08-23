@@ -1,0 +1,62 @@
+version: "3.2"
+
+services:
+  plat:
+    image: plat:local
+    build:
+      context: ../plat-services/
+      dockerfile: Dockerfile-plat
+    hostname: plat
+    env_file:
+      - environment/plat.env
+    environment:
+      PLAT_INSPECT_PORT: 9201
+    entrypoint: yarn start-plat-debug
+    ports:
+      - "${PLAT_INSPECT_PORT:-9201}:${PLAT_INSPECT_PORT:-9201}"
+    volumes:
+      - ../plat-services/lib:/usr/src/app/lib:delegated
+      - ../plat-services/services:/usr/src/app/services:delegated
+    networks:
+      - achieve
+    external_links:
+      - proxy:consul.local-mml.cloud
+      - proxy:iam.local-mml.cloud
+      - proxy:assess.local-mml.cloud
+      - proxy:pythag.local-mml.cloud
+      - proxy:courseware.local-mml.cloud
+      - proxy:learningcurve-api.local-mml.cloud
+      - proxy:plat.local-mml.cloud
+      - proxy:reading.local-mml.cloud
+      - proxy:writing-api.local-mml.cloud
+      - proxy:ads.local-mml.cloud
+      - proxy:pathfinder.local-mml.cloud
+      - proxy:gradebook-api.local-mml.cloud
+
+  plat-migration:
+    image: boxfuse/flyway:latest
+    volumes:
+      - ../plat-services/migrations/conf:/flyway/conf:delegated
+      - ../plat-services/migrations/sql/:/flyway/sql:delegated
+    environment:
+      - POSTGRES_USER=${PGUSER:-postgres}
+      - POSTGRES_PASSWORD=${PGPASSWORD:-postgres}
+      - POSTGRES_DB=${PLAT_DATABASE}
+    command: -X -url=jdbc:postgresql://${PGHOST}:5432/$PLAT_DATABASE -user=$PGUSER -password='$PGPASSWORD' -table=flyway_schema_history migrate
+    env_file:
+      - environment/plat.env
+    networks:
+      - achieve
+    depends_on:
+      - postgres
+    external_links:
+      - proxy:consul.local-mml.cloud
+      - proxy:iam.local-mml.cloud
+      - proxy:assess.local-mml.cloud
+      - proxy:pythag.local-mml.cloud
+      - proxy:courseware.local-mml.cloud
+      - proxy:learningcurve-api.local-mml.cloud
+      - proxy:plat.local-mml.cloud
+      - proxy:reading.local-mml.cloud
+      - proxy:writing-api.local-mml.cloud
+      - proxy:ads.local-mml.cloud
